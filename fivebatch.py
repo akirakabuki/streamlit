@@ -1,99 +1,103 @@
 import streamlit as st
-import numpy as np
 from itertools import combinations
 from statistics import mean, stdev
 
-st.title("バッチ探索アプリ")
+# 候補点の生成（X + Y = 100 を満たす点のみ）
+def generate_candidates(x_min=94.5, x_max=98.5, step=0.1):
+    candidates = []
+    x = x_min
+    while x <= x_max:
+        y = 100.0 - x
+        if 0 <= y <= 5.5:  # Yが非負かつ現実的な上限内
+            candidates.append((round(x, 2), round(y, 2)))
+        x = round(x + step, 10)
+    return candidates
 
-st.markdown("初期バッチ（2〜4件）と探索の `grid_step` を指定して、条件を満たす残りのバッチ候補を探索します。")
+# 条件チェック関数
+def is_valid_combination(full_data):
+    Xs = [x for x, _ in full_data]
+    Ys = [y for _, y in full_data]
 
-# 初期バッチ数選択
-num_batches = st.selectbox("初期バッチ数 (2〜4)", [2, 3, 4])
+    if len(set(Xs)) < 2:  # Xの多様性チェック（任意）
+        return False
 
-initial_batches = []
-st.markdown("### 初期バッチデータ入力")
-for i in range(num_batches):
-    cols = st.columns(3)
-    with cols[0]:
-        x = st.number_input(f"Batch {i+1} - X", min_value=94.5, max_value=98.5, step=0.1, format="%.2f", key=f"x{i}")
-    with cols[1]:
-        y = st.number_input(f"Batch {i+1} - Y", min_value=0.0, max_value=5.5, step=0.1, format="%.2f", key=f"y{i}")
-    with cols[2]:
-        st.write(f"X + Y = {x + y:.2f}")
-    initial_batches.append((x, y))
+    x_mean = mean(Xs)
+    y_mean = mean(Ys)
+    if len(Xs) < 2 or len(Ys) < 2:
+        return False
+    x_std = stdev(Xs)
+    y_std = stdev(Ys)
 
-# grid_stepの指定
-grid_step = st.slider("探索刻み幅 (grid_step)", min_value=0.05, max_value=1.0, value=0.1, step=0.05)
+    # 条件1: Yの平均 + 3σ ≤ 5
+    if y_mean + 3 * y_std > 5:
+        return False
 
-# 探索ボタン
-if st.button("探索開始"):
+    # 条件2: Xの平均 - 3σ ∈ [94, 95)
+    if not (94 <= x_mean - 3 * x_std < 95):
+        return False
 
-    def is_valid_combination(data, added_data):
-        Xs = [x for x, _ in data]
-        Ys = [y for _, y in data]
+    # 条件3: 少なくとも1つのXが98以上
+    if not any(x >= 98 for x in Xs):
+        return False
 
-        if len(Xs) < 2:
-            return False
+    return True
 
-        x_mean = mean(Xs)
-        y_mean = mean(Ys)
-        x_std = stdev(Xs)
-        y_std = stdev(Ys)
+# アプリ本体
+def main():
+    st.title("バッチ組み合わせ探索ツール (X+Y=100 固定)")
 
-        if y_mean + 3 * y_std > 5:
-            return False
-        if not (94 <= x_mean - 3 * x_std < 95):
-            return False
-        if any(x < 94.5 or x > 98.5 for x in Xs):
-            return False
-        if any(not (99.0 <= x + y <= 100.0) for x, y in data):
-            return False
-        if not any(x >= 98 for x, _ in added_data):
-            return False
+    st.markdown("### 🔢 初期バッチの入力（2〜4件）")
+    n_initial = st.slider("初期バッチ数", 2, 4, 3)
+    initial_batches = []
+    for i in range(n_initial):
+        col1, col2 = st.columns(2)
+        with col1:
+            x = st.number_input(f"Batch {i+1} - X", value=97.0, key=f"x_{i}")
+        with col2:
+            y = st.number_input(f"Batch {i+1} - Y", value=3.0, key=f"y_{i}")
+        if abs(x + y - 100.0) > 1e-6:
+            st.error(f"Batch {i+1} の X + Y が100ではありません")
+        initial_batches.append((x, y))
 
-        return True
+    grid_step = st.number_input("グリッドステップ (X方向)", value=0.1, min_value=0.01, max_value=1.0, step=0.01)
 
-    def search_combinations_within_range(initial_batches, grid_step=0.1):
-        n = len(initial_batches)
-        remaining = 5 - n
-        X_range = np.arange(94.5, 98.5 + grid_step, grid_step)
-        Y_range = np.arange(0.0, 5.5 + grid_step, grid_step)
+    if st.button("組合せ探索"):
+        st.markdown("## 🔍 結果")
+        candidates = generate_candidates(step=grid_step)
+        n_to_add = 5 - n_initial
+        results = []
 
-        all_candidates = [
-            (x, y) for x in X_range for y in Y_range if 99.0 <= x + y <= 100.0
-        ]
+        for combo in combinations(candidates, n_to_add):
+            full_data = initial_batches + list(combo)
+            if is_valid_combination(full_data):
+                Xs = [x for x, _ in full_data]
+                x_mean = mean(Xs)
+                x_std = stdev(Xs)
+                x_score = x_mean + 3 * x_std
+                results.append((combo, x_score))
 
-        valid_results = []
+        if results:
+            results.sort(key=lambda x: x[1], reverse=True)
 
-        for combo in combinations(all_candidates, remaining):
-            combined = initial_batches + list(combo)
-            if is_valid_combination(combined, list(combo)):
-                Xs = [x for x, _ in combined]
-                score = mean(Xs) + 3 * stdev(Xs)
-                valid_results.append((combo, score))
+            for i, (combo, score) in enumerate(results[:5], 1):
+                st.markdown(f"### ✅ Top {i} 組合せ (Xの平均+3σ={score:.3f})")
 
-        valid_results.sort(key=lambda x: x[1], reverse=True)
-        return valid_results
+                full_data = initial_batches + list(combo)
+                Xs = [x for x, _ in full_data]
+                Ys = [y for _, y in full_data]
+                x_mean = mean(Xs)
+                y_mean = mean(Ys)
+                x_std = stdev(Xs)
+                y_std = stdev(Ys)
 
-    with st.spinner("探索中..."):
-        results = search_combinations_within_range(initial_batches, grid_step)
+                st.write(f"📊 Xの平均 ± 3σ: [{x_mean - 3*x_std:.3f}, {x_mean + 3*x_std:.3f}]")
+                st.write(f"📊 Yの平均 + 3σ: {y_mean + 3*y_std:.3f}")
 
-    st.success(f"探索完了！条件を満たす組合せが {len(results)} 件見つかりました。")
+                for j, (x, y) in enumerate(combo, 1):
+                    st.write(f"追加Batch {j}: X={x:.2f}, Y={y:.2f}, X+Y={x+y:.2f}")
+        else:
+            st.warning("条件を満たす組み合わせが見つかりませんでした。")
 
-    for i, (combo, score) in enumerate(results[:5], 1):
-        st.markdown(f"### Top {i} 組合せ (Xの平均+3σ={score:.3f})")
-
-        full_data = initial_batches + list(combo)
-        Xs = [x for x, _ in full_data]
-        Ys = [y for _, y in full_data]
-        x_mean = mean(Xs)
-        y_mean = mean(Ys)
-        x_std = stdev(Xs)
-        y_std = stdev(Ys)
-
-        st.write(f"📊 Xの平均 ± 3σ: [{x_mean - 3*x_std:.3f}, {x_mean + 3*x_std:.3f}]")
-        st.write(f"📊 Yの平均 + 3σ: {y_mean + 3*y_std:.3f}")
-
-        for j, (x, y) in enumerate(combo, 1):
-            st.write(f"追加Batch {j}: X={x:.2f}, Y={y:.2f}, X+Y={x+y:.2f}")
+if __name__ == "__main__":
+    main()
 
