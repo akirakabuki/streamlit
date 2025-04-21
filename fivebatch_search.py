@@ -1,24 +1,23 @@
 import streamlit as st
 import pandas as pd
 import chardet
-from statistics import mean, stdev
+from statistics import mean, stdev, pstdev
 from itertools import combinations, product
 
 # 条件を満たすかを判定する関数
-def is_valid_batch_set(batches):
+def is_valid_batch_set(batches, unbiased):
     x_vals = [b[1] for b in batches]
     y_vals = [b[2] for b in batches]
 
     if len(x_vals) < 2:
         return False
 
-    y_mean = mean(y_vals)
-    y_std = stdev(y_vals)
-    if y_mean + 3 * y_std > 5:
+    y_std = stdev(y_vals) if unbiased else pstdev(y_vals)
+    if mean(y_vals) + 3 * y_std > 5:
         return False
 
+    x_std = stdev(x_vals) if unbiased else pstdev(x_vals)
     x_mean = mean(x_vals)
-    x_std = stdev(x_vals)
     if not (94 <= x_mean - 3 * x_std < 95):
         return False
 
@@ -45,13 +44,12 @@ def detect_encoding(file):
     return encoding
 
 def main():
-    st.title("\U0001F4CA 5バッチ探索アプリ")
+    st.title("\U0001F4CA バッチ条件探索アプリ")
 
     uploaded_file = st.file_uploader("CSVファイルをアップロードしてください (batch,x,y)", type=["csv"])
     grid_step = st.number_input("追加バッチ探索のステップ幅 (例: 0.1)", min_value=0.01, max_value=1.0, value=0.1, step=0.01)
-    st.text("条件")
-    st.text("1. Yの平均+3σは5以下")
-    st.text("    2. Xの平均－3σは94以上95未満")
+    unbiased = st.toggle("不偏標準偏差を使用する", value=True)
+
     if uploaded_file:
         try:
             encoding = detect_encoding(uploaded_file)
@@ -71,7 +69,7 @@ def main():
 
         # 既存データから条件に合う組み合わせを探索
         for combo in combinations(records, 5):
-            if is_valid_batch_set(combo):
+            if is_valid_batch_set(combo, unbiased):
                 found_sets.append(combo)
                 if len(found_sets) >= 5:
                     break
@@ -83,8 +81,10 @@ def main():
                 st.table(pd.DataFrame(combo, columns=['batch', 'x', 'y']))
                 x_vals = [b[1] for b in combo]
                 y_vals = [b[2] for b in combo]
-                st.write(f"X 平均 ± 3σ: {mean(x_vals):.2f} ± {3*stdev(x_vals):.2f}")
-                st.write(f"Y 平均 + 3σ: {mean(y_vals) + 3*stdev(y_vals):.2f}")
+                x_std = stdev(x_vals) if unbiased else pstdev(x_vals)
+                y_std = stdev(y_vals) if unbiased else pstdev(y_vals)
+                st.write(f"X 平均 ± 3σ: {mean(x_vals):.2f} ± {3*x_std:.2f}")
+                st.write(f"Y 平均 + 3σ: {mean(y_vals) + 3*y_std:.2f}")
         else:
             st.warning("既存データのみでは条件を満たす組み合わせは見つかりませんでした。追加候補を探索中…")
             additional_batches = generate_additional_batches(grid_step)
@@ -92,13 +92,15 @@ def main():
                 for add_combo in combinations(additional_batches, n_add):
                     for orig_combo in combinations(records, 5 - n_add):
                         new_combo = list(orig_combo) + [(None, x, y) for x, y in add_combo]
-                        if is_valid_batch_set(new_combo):
+                        if is_valid_batch_set(new_combo, unbiased):
                             st.success(f"{n_add}個の追加バッチで条件を満たす組み合わせが見つかりました")
                             st.table(pd.DataFrame(new_combo, columns=['batch', 'x', 'y']))
                             x_vals = [b[1] for b in new_combo]
                             y_vals = [b[2] for b in new_combo]
-                            st.write(f"X 平均 ± 3σ: {mean(x_vals):.2f} ± {3*stdev(x_vals):.2f}")
-                            st.write(f"Y 平均 + 3σ: {mean(y_vals) + 3*stdev(y_vals):.2f}")
+                            x_std = stdev(x_vals) if unbiased else pstdev(x_vals)
+                            y_std = stdev(y_vals) if unbiased else pstdev(y_vals)
+                            st.write(f"X 平均 ± 3σ: {mean(x_vals):.2f} ± {3*x_std:.2f}")
+                            st.write(f"Y 平均 + 3σ: {mean(y_vals) + 3*y_std:.2f}")
                             return
 
             st.error("条件を満たす組み合わせが見つかりませんでした。grid_stepを小さくして再試行してください。")
