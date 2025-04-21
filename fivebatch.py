@@ -84,7 +84,7 @@ def main():
                 st.write(f"📊 Yの平均 + 3σ: {y_mean + 3*y_std:.3f}")
 
                 for j, (x, y) in enumerate(combo, 1):
-                    st.write(f"追加Batch {j}: X={x:.2f}, Y={y:.2f}, 合計={x+y:.2f}")
+                    st.write(f"追加Batch {j}: X={x:.2f}, Y={y:.2f}")
         else:
             st.warning("⚠️ 条件を満たす組合せは見つかりませんでした。")
 
