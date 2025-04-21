@@ -70,18 +70,19 @@ def main():
         # 既存データから条件に合う組み合わせを探索
         for combo in combinations(records, 5):
             if is_valid_batch_set(combo, unbiased):
-                found_sets.append(combo)
-                if len(found_sets) >= 5:
-                    break
+                x_vals = [b[1] for b in combo]
+                x_std = stdev(x_vals) if unbiased else pstdev(x_vals)
+                found_sets.append((combo, x_std))
 
         if found_sets:
-            st.success(f"既存データで条件を満たす組み合わせが見つかりました")
-            for i, combo in enumerate(found_sets):
-                st.subheader(f"組み合わせ {i+1}")
+            # 条件に合う中でXの標準偏差が大きい順に並び替え
+            found_sets.sort(key=lambda x: x[1], reverse=True)
+            st.success(f"既存データで条件を満たす組み合わせが {len(found_sets)} 件見つかりました（上位5件を表示）")
+            for i, (combo, x_std) in enumerate(found_sets[:5]):
+                st.subheader(f"組み合わせ {i+1} (X標準偏差: {x_std:.2f})")
                 st.table(pd.DataFrame(combo, columns=['batch', 'x', 'y']))
                 x_vals = [b[1] for b in combo]
                 y_vals = [b[2] for b in combo]
-                x_std = stdev(x_vals) if unbiased else pstdev(x_vals)
                 y_std = stdev(y_vals) if unbiased else pstdev(y_vals)
                 st.write(f"X 平均 ± 3σ: {mean(x_vals):.2f} ± {3*x_std:.2f}")
                 st.write(f"Y 平均 + 3σ: {mean(y_vals) + 3*y_std:.2f}")
