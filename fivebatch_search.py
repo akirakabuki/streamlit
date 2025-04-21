@@ -65,21 +65,25 @@ def main():
         st.dataframe(df)
 
         records = list(df.itertuples(index=False, name=None))
-        found_valid_set = False
+        found_sets = []
 
         # 既存データから条件に合う組み合わせを探索
         for combo in combinations(records, 5):
             if is_valid_batch_set(combo):
-                st.success("既存データで条件を満たす5バッチが見つかりました")
+                found_sets.append(combo)
+                if len(found_sets) >= 5:
+                    break
+
+        if found_sets:
+            st.success(f"既存データで条件を満たす組み合わせが {len(found_sets)} 件見つかりました")
+            for i, combo in enumerate(found_sets):
+                st.subheader(f"組み合わせ {i+1}")
                 st.table(pd.DataFrame(combo, columns=['batch', 'x', 'y']))
                 x_vals = [b[1] for b in combo]
                 y_vals = [b[2] for b in combo]
                 st.write(f"X 平均 ± 3σ: {mean(x_vals):.2f} ± {3*stdev(x_vals):.2f}")
                 st.write(f"Y 平均 + 3σ: {mean(y_vals) + 3*stdev(y_vals):.2f}")
-                found_valid_set = True
-                break
-
-        if not found_valid_set:
+        else:
             st.warning("既存データのみでは条件を満たす組み合わせは見つかりませんでした。追加候補を探索中…")
             additional_batches = generate_additional_batches(grid_step)
             for n_add in range(1, 4):
