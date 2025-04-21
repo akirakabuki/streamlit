@@ -49,7 +49,9 @@ def main():
 
     uploaded_file = st.file_uploader("CSVファイルをアップロードしてください (batch,x,y)", type=["csv"])
     grid_step = st.number_input("追加バッチ探索のステップ幅 (例: 0.1)", min_value=0.01, max_value=1.0, value=0.1, step=0.01)
-
+    st.text("条件")
+    st.text("1. Yの平均+3σは5以下")
+    st.text("    2. Xの平均-3σは94以上95未満")
     if uploaded_file:
         try:
             encoding = detect_encoding(uploaded_file)
