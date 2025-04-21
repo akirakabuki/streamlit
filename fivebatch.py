@@ -40,7 +40,8 @@ def is_valid_combination(full_data):
 # Streamlit アプリ本体
 def main():
     st.title("バッチ組み合わせ探索アプリ")
-    st.text("条件：1. Yの平均+3σは5以下")
+    st.text("条件")
+    st.text("1. Yの平均+3σは5以下")
     st.text("    2. Xの平均-3σは94以上95未満")
     st.text("    3. X+Yの合計は100")
     st.text("    4. Xの範囲は94.5以上98.5以下")
