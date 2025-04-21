@@ -75,7 +75,7 @@ def main():
                     break
 
         if found_sets:
-            st.success(f"既存データで条件を満たす組み合わせが {len(found_sets)} 件見つかりました")
+            st.success(f"既存データで条件を満たす組み合わせが見つかりました")
             for i, combo in enumerate(found_sets):
                 st.subheader(f"組み合わせ {i+1}")
                 st.table(pd.DataFrame(combo, columns=['batch', 'x', 'y']))
