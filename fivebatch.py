@@ -40,7 +40,11 @@ def is_valid_combination(full_data):
 # Streamlit アプリ本体
 def main():
     st.title("バッチ組み合わせ探索アプリ")
-    st.text("条件：1.Yの平均+3σは5以下、2: Xの平均-3σは94以上95未満、3: X+Yの合計は100, 4: Xの範囲は94.5以上98.5以下、5: Xの平均+3σの値ができるだけ大きいものtop5を選抜")
+    st.text("条件：1. Yの平均+3σは5以下")
+    st.text("    2. Xの平均-3σは94以上95未満")
+    st.text("    3. X+Yの合計は100")
+    st.text("    4. Xの範囲は94.5以上98.5以下")
+    st.text("    5. Xの平均+3σの値ができるだけ大きいものtop5を選抜")
     st.markdown("### 🔢 初期バッチの入力")
     n_initial = st.slider("初期バッチ数を選択（2〜4）", 2, 4, 3)
     initial_batches = []
