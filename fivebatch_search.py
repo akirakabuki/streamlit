@@ -1,96 +1,101 @@
 import streamlit as st
 import pandas as pd
+import chardet
 from statistics import mean, stdev
 from itertools import combinations, product
 
-# ğŒ‚ğ–‚½‚·‚©ƒ`ƒFƒbƒN
-def satisfies_conditions(Xs, Ys):
-    if len(Xs) < 2:
+# æ¡ä»¶ã‚’æº€ãŸã™ã‹ã‚’åˆ¤å®šã™ã‚‹é–¢æ•°
+def is_valid_batch_set(batches):
+    x_vals = [b[1] for b in batches]
+    y_vals = [b[2] for b in batches]
+
+    if len(x_vals) < 2:
         return False
-    x_mean = mean(Xs)
-    x_std = stdev(Xs)
-    y_mean = mean(Ys)
-    y_std = stdev(Ys)
 
-    return (
-        (y_mean + 3 * y_std <= 5) and
-        (94 <= x_mean - 3 * x_std < 95)
-    )
+    y_mean = mean(y_vals)
+    y_std = stdev(y_vals)
+    if y_mean + 3 * y_std > 5:
+        return False
 
-# ğŒ‚ğ–‚½‚·‘g‚İ‡‚í‚¹‚ğ’T‚·
-def find_valid_combinations(df):
-    valid_combos = []
-    for combo in combinations(df.itertuples(index=False), 5):
-        Xs = [row.x for row in combo]
-        Ys = [row.y for row in combo]
-        if satisfies_conditions(Xs, Ys):
-            valid_combos.append(combo)
-    return valid_combos
+    x_mean = mean(x_vals)
+    x_std = stdev(x_vals)
+    if not (94 <= x_mean - 3 * x_std < 95):
+        return False
 
-# V‚½‚É’Ç‰Á‚·‚éƒoƒbƒ`Œó•â¶¬iX + Y = 100j
-def generate_candidate_batches(x_min=94.5, x_max=98.4, step=0.1):
-    candidates = []
-    x = x_min
-    while x <= x_max:
-        y = 100 - x
-        candidates.append((round(x, 2), round(y, 2)))
-        x = round(x + step, 10)
+    return True
+
+# è¿½åŠ å€™è£œãƒãƒƒãƒã‚’æ¢ç´¢ã™ã‚‹é–¢æ•°
+def generate_additional_batches(grid_step):
+    x_candidates = [round(x, 2) for x in list(frange(94.5, 98.5, grid_step))]
+    candidates = [(x, round(100 - x, 2)) for x in x_candidates if 94.5 <= x < 98.5 and 1.5 <= 100 - x <= 5.5]
     return candidates
 
-# ’Ç‰Áƒoƒbƒ`‚É‚æ‚Á‚ÄğŒ‚ğ–‚½‚¹‚é‚©’Tõ
-def search_with_additions(existing_data, candidates, max_add=3):
-    for k in range(1, max_add + 1):
-        for extra in combinations(candidates, k):
-            merged = existing_data + list(extra)
-            if len(merged) >= 5:
-                for combo in combinations(merged, 5):
-                    Xs = [x for x, _ in combo]
-                    Ys = [y for _, y in combo]
-                    if satisfies_conditions(Xs, Ys):
-                        return combo
-    return None
+# rangeã®floatç‰ˆ
+def frange(start, stop, step):
+    while start < stop:
+        yield start
+        start += step
 
-# Streamlit UI
+# æ–‡å­—ã‚³ãƒ¼ãƒ‰è‡ªå‹•æ¤œå‡º
+def detect_encoding(file):
+    raw = file.read()
+    result = chardet.detect(raw)
+    encoding = result['encoding']
+    file.seek(0)
+    return encoding
+
 def main():
-    st.title("?? ƒoƒbƒ`ğŒ’TõƒAƒvƒŠ")
+    st.title("\U0001F4CA ãƒãƒƒãƒæ¡ä»¶æ¢ç´¢ã‚¢ãƒ—ãƒª")
 
-    uploaded_file = st.file_uploader("CSVƒtƒ@ƒCƒ‹‚ğƒAƒbƒvƒ[ƒh‚µ‚Ä‚­‚¾‚³‚¢ibatch, x, yj", type=["csv"])
-    step = st.number_input("’Ç‰Áƒoƒbƒ`’Tõ‚ÌƒXƒeƒbƒv•", min_value=0.01, max_value=1.0, value=0.1)
+    uploaded_file = st.file_uploader("CSVãƒ•ã‚¡ã‚¤ãƒ«ã‚’ã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ‰ã—ã¦ãã ã•ã„ (batch,x,y)", type=["csv"])
+    grid_step = st.number_input("è¿½åŠ ãƒãƒƒãƒæ¢ç´¢ã®ã‚¹ãƒ†ãƒƒãƒ—å¹… (ä¾‹: 0.1)", min_value=0.01, max_value=1.0, value=0.1, step=0.01)
 
     if uploaded_file:
-        df = pd.read_csv(uploaded_file)
+        try:
+            encoding = detect_encoding(uploaded_file)
+            df = pd.read_csv(uploaded_file, encoding=encoding)
+        except Exception as e:
+            st.error(f"ãƒ•ã‚¡ã‚¤ãƒ«ã®èª­ã¿è¾¼ã¿ã«å¤±æ•—ã—ã¾ã—ãŸ: {e}")
+            return
+
+        if not {'batch', 'x', 'y'}.issubset(df.columns):
+            st.error("CSVã«å¿…è¦ãªåˆ— (batch, x, y) ãŒå«ã¾ã‚Œã¦ã„ã¾ã›ã‚“ã€‚")
+            return
+
         st.dataframe(df)
 
-        existing_data = list(zip(df["x"], df["y"]))
-        st.markdown("### ? ğŒ‚ğ–‚½‚·5ƒoƒbƒ`‚Ì‘g‡‚¹‚ğ’Tõ’†...")
+        records = list(df.itertuples(index=False, name=None))
+        found_valid_set = False
 
-        valid = find_valid_combinations(df)
+        # æ—¢å­˜ãƒ‡ãƒ¼ã‚¿ã‹ã‚‰æ¡ä»¶ã«åˆã†çµ„ã¿åˆã‚ã›ã‚’æ¢ç´¢
+        for combo in combinations(records, 5):
+            if is_valid_batch_set(combo):
+                st.success("æ—¢å­˜ãƒ‡ãƒ¼ã‚¿ã§æ¡ä»¶ã‚’æº€ãŸã™5ãƒãƒƒãƒãŒè¦‹ã¤ã‹ã‚Šã¾ã—ãŸ")
+                st.table(pd.DataFrame(combo, columns=['batch', 'x', 'y']))
+                x_vals = [b[1] for b in combo]
+                y_vals = [b[2] for b in combo]
+                st.write(f"X å¹³å‡ Â± 3Ïƒ: {mean(x_vals):.2f} Â± {3*stdev(x_vals):.2f}")
+                st.write(f"Y å¹³å‡ + 3Ïƒ: {mean(y_vals) + 3*stdev(y_vals):.2f}")
+                found_valid_set = True
+                break
 
-        if valid:
-            st.success(f"{len(valid)} Œ‚Ì‘g‡‚¹‚ªŒ©‚Â‚©‚è‚Ü‚µ‚½B")
-            for i, combo in enumerate(valid[:5]):
-                Xs = [row.x for row in combo]
-                Ys = [row.y for row in combo]
-                st.markdown(f"#### ‘g‡‚¹ {i+1}")
-                st.write(pd.DataFrame(combo))
-                st.write(f"X‚Ì•½‹Ï}3ƒĞ: {mean(Xs) - 3*stdev(Xs):.2f} ` {mean(Xs) + 3*stdev(Xs):.2f}")
-                st.write(f"Y‚Ì•½‹Ï+3ƒĞ: {mean(Ys) + 3*stdev(Ys):.2f}")
-        else:
-            st.warning("? ğŒ‚ğ–‚½‚·‘g‡‚¹‚ªŒ©‚Â‚©‚è‚Ü‚¹‚ñ‚Å‚µ‚½B")
-            st.markdown("### ? ’Ç‰Áƒoƒbƒ`‚ÅğŒ’B¬‚ğs’†...")
-            candidates = generate_candidate_batches(step=step)
-            result = search_with_additions(existing_data, candidates)
+        if not found_valid_set:
+            st.warning("æ—¢å­˜ãƒ‡ãƒ¼ã‚¿ã®ã¿ã§ã¯æ¡ä»¶ã‚’æº€ãŸã™çµ„ã¿åˆã‚ã›ã¯è¦‹ã¤ã‹ã‚Šã¾ã›ã‚“ã§ã—ãŸã€‚è¿½åŠ å€™è£œã‚’æ¢ç´¢ä¸­â€¦")
+            additional_batches = generate_additional_batches(grid_step)
+            for n_add in range(1, 4):
+                for add_combo in combinations(additional_batches, n_add):
+                    for orig_combo in combinations(records, 5 - n_add):
+                        new_combo = list(orig_combo) + [(None, x, y) for x, y in add_combo]
+                        if is_valid_batch_set(new_combo):
+                            st.success(f"{n_add}å€‹ã®è¿½åŠ ãƒãƒƒãƒã§æ¡ä»¶ã‚’æº€ãŸã™çµ„ã¿åˆã‚ã›ãŒè¦‹ã¤ã‹ã‚Šã¾ã—ãŸ")
+                            st.table(pd.DataFrame(new_combo, columns=['batch', 'x', 'y']))
+                            x_vals = [b[1] for b in new_combo]
+                            y_vals = [b[2] for b in new_combo]
+                            st.write(f"X å¹³å‡ Â± 3Ïƒ: {mean(x_vals):.2f} Â± {3*stdev(x_vals):.2f}")
+                            st.write(f"Y å¹³å‡ + 3Ïƒ: {mean(y_vals) + 3*stdev(y_vals):.2f}")
+                            return
 
-            if result:
-                st.success("’Ç‰Áƒoƒbƒ`‚İ‚ÅğŒ‚ğ–‚½‚·‘g‡‚¹‚ªŒ©‚Â‚©‚è‚Ü‚µ‚½I")
-                df_result = pd.DataFrame(result, columns=["x", "y"])
-                st.dataframe(df_result)
-                Xs = [x for x, _ in result]
-                Ys = [y for _, y in result]
-                st.write(f"X‚Ì•½‹Ï}3ƒĞ: {mean(Xs) - 3*stdev(Xs):.2f} ` {mean(Xs) + 3*stdev(Xs):.2f}")
-                st.write(f"Y‚Ì•½‹Ï+3ƒĞ: {mean(Ys) + 3*stdev(Ys):.2f}")
-            else:
-                st.error("’Ç‰Á‚µ‚Ä‚àğŒ‚ğ–‚½‚·‘g‡‚¹‚ÍŒ©‚Â‚©‚è‚Ü‚¹‚ñ‚Å‚µ‚½B")
+            st.error("æ¡ä»¶ã‚’æº€ãŸã™çµ„ã¿åˆã‚ã›ãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“ã§ã—ãŸã€‚grid_stepã‚’å°ã•ãã—ã¦å†è©¦è¡Œã—ã¦ãã ã•ã„ã€‚")
 
 if __name__ == "__main__":
     main()
