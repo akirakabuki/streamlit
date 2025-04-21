@@ -82,5 +82,18 @@ if st.button("探索開始"):
 
     for i, (combo, score) in enumerate(results[:5], 1):
         st.markdown(f"### Top {i} 組合せ (Xの平均+3σ={score:.3f})")
+
+        full_data = initial_batches + list(combo)
+        Xs = [x for x, _ in full_data]
+        Ys = [y for _, y in full_data]
+        x_mean = mean(Xs)
+        y_mean = mean(Ys)
+        x_std = stdev(Xs)
+        y_std = stdev(Ys)
+
+        st.write(f"📊 Xの平均 ± 3σ: [{x_mean - 3*x_std:.3f}, {x_mean + 3*x_std:.3f}]")
+        st.write(f"📊 Yの平均 + 3σ: {y_mean + 3*y_std:.3f}")
+
         for j, (x, y) in enumerate(combo, 1):
             st.write(f"追加Batch {j}: X={x:.2f}, Y={y:.2f}, X+Y={x+y:.2f}")
+
