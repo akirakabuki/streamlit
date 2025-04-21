@@ -45,7 +45,7 @@ def detect_encoding(file):
     return encoding
 
 def main():
-    st.title("\U0001F4CA バッチ条件探索アプリ")
+    st.title("\U0001F4CA 5バッチ探索アプリ")
 
     uploaded_file = st.file_uploader("CSVファイルをアップロードしてください (batch,x,y)", type=["csv"])
     grid_step = st.number_input("追加バッチ探索のステップ幅 (例: 0.1)", min_value=0.01, max_value=1.0, value=0.1, step=0.01)
